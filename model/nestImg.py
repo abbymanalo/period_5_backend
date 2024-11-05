@@ -22,9 +22,16 @@ def nestImg_base64_decode(user_id, imageURL):
         with open(img_path, 'rb') as img_file:
             base64_encoded = base64.b64encode(img_file.read()).decode('utf-8')
         return base64_encoded
+    except FileNotFoundError:
+        print(f'File not found: {img_path}')
+        return None
+    except PermissionError:
+        print(f'Permission denied: {img_path}')
+        return None
     except Exception as e:
         print(f'An error occurred while reading the post picture: {str(e)}')
         return None
+
 
 def nestImg_base64_upload(base64_image, user_uid):
     """
