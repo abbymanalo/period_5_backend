@@ -17,9 +17,9 @@ class UserAPI:
     """
     Define the API endpoints for the User model.
     """
-    class _BULK(Resource):
+    class _BULK_CRUD(Resource):
         """
-        Users API operation for bulk Create.
+        Users API operation for bulk Create and Read.
         """
 
         def post(self):
@@ -31,7 +31,7 @@ class UserAPI:
             if not isinstance(users, list):
                 return {'message': 'Expected a list of user data'}, 400
 
-            results = {'errors': []}
+            results = {'errors': [], 'success_count': 0, 'error_count': 0}
 
             with current_app.test_client() as client:
                 for user in users:
@@ -41,9 +41,11 @@ class UserAPI:
                     # Simulate a POST request to the single user creation endpoint
                     response = client.post('/api/user', json=user)
 
-                    if response.status_code != 200:  # Assuming success status code is 200
+                    if response.status_code == 200:
+                        results['success_count'] += 1
+                    else:
                         results['errors'].append(response.get_json())
-                        continue
+                        results['error_count'] += 1
 
             return jsonify(results)
         
@@ -87,7 +89,6 @@ class UserAPI:
             uid = body.get('uid')
             if uid is None or len(uid) < 2:
                 return {'message': 'User ID is missing, or is less than 2 characters'}, 400
-
 
             # Setup minimal USER OBJECT
             user_obj = User(name=name, uid=uid)
@@ -235,6 +236,6 @@ class UserAPI:
                 }, 500
 
 # Register the API resources with the Blueprint
-api.add_resource(UserAPI._BULK, '/users')
+api.add_resource(UserAPI._BULK_CRUD, '/users')
 api.add_resource(UserAPI._CRUD, '/user')
 api.add_resource(UserAPI._Security, '/authenticate')

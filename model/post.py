@@ -1,45 +1,49 @@
 # post.py
 from sqlite3 import IntegrityError
-from sqlalchemy import Text
+from sqlalchemy import Text, JSON
 from __init__ import app, db
 from model.user import User
-from model.group import Group
+from model.channel import Channel
 
 class Post(db.Model):
     """
     Post Model
     
-    The Post class represents an individual contribution or discussion within a group.
+    The Post class represents an individual contribution or discussion within a channel.
     
     Attributes:
         id (db.Column): The primary key, an integer representing the unique identifier for the post.
         _title (db.Column): A string representing the title of the post.
-        _content (db.Column): A Text blob representing the content of the post.
+        _comment (db.Column): A string representing the comment of the post.
+        _content (db.Column): A JSON blob representing the content of the post.
         _user_id (db.Column): An integer representing the user who created the post.
-        _group_id (db.Column): An integer representing the group to which the post belongs.
+        _channel_id (db.Column): An integer representing the channel to which the post belongs.
     """
     __tablename__ = 'posts'
 
     id = db.Column(db.Integer, primary_key=True)
     _title = db.Column(db.String(255), nullable=False)
-    _content = db.Column(Text, nullable=False)
+    _comment = db.Column(db.String(255), nullable=False)
+    _content = db.Column(JSON, nullable=False)
     _user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    _group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
+    _channel_id = db.Column(db.Integer, db.ForeignKey('channels.id'), nullable=False)
 
-    def __init__(self, title, content, user_id, group_id):
+    def __init__(self, title, comment, user_id, channel_id, content={}):
         """
         Constructor, 1st step in object creation.
         
         Args:
             title (str): The title of the post.
-            content (str): The content of the post.
+            comment (str): The comment of the post.
             user_id (int): The user who created the post.
-            group_id (int): The group to which the post belongs.
+            channel_id (int): The channel to which the post belongs.
+            content (dict): The content of the post.
         """
         self._title = title
-        self._content = content
+        self._comment = comment
         self._user_id = user_id
-        self._group_id = group_id
+        self._channel_id = channel_id
+        self._content = content
 
     def __repr__(self):
         """
@@ -49,7 +53,7 @@ class Post(db.Model):
         Returns:
             str: A text representation of how to create the object.
         """
-        return f"Post(id={self.id}, title={self._title}, content={self._content}, user_id={self._user_id}, group_id={self._group_id})"
+        return f"Post(id={self.id}, title={self._title}, comment={self._comment}, content={self._content}, user_id={self._user_id}, channel_id={self._channel_id})"
 
     def create(self):
         """
@@ -73,37 +77,55 @@ class Post(db.Model):
         The read method retrieves the object data from the object's attributes and returns it as a dictionary.
         
         Uses:
-            The Group.query and User.query methods to retrieve the group and user objects.
+            The Channel.query and User.query methods to retrieve the channel and user objects.
         
         Returns:
-            dict: A dictionary containing the post data, including user and group names.
+            dict: A dictionary containing the post data, including user and channel names.
         """
         user = User.query.get(self._user_id)
-        group = Group.query.get(self._group_id)
+        channel = Channel.query.get(self._channel_id)
         data = {
             "id": self.id,
             "title": self._title,
+            "comment": self._comment,
             "content": self._content,
             "user_name": user.name if user else None,
-            "group_name": group.name if group else None
+            "channel_name": channel.name if channel else None
         }
         return data
     
-    def update(self):
+
+    def update(self, inputs):
         """
-        The update method commits the transaction to the database.
+        Updates the post object with new data.
         
-        Uses:
-            The db ORM method to commit the transaction.
+        Args:
+            inputs (dict): A dictionary containing the new data for the post.
         
-        Raises:
-            Exception: An error occurred when updating the object in the database.
+        Returns:
+            Post: The updated post object, or None on error.
         """
+        if not isinstance(inputs, dict):
+            return self
+
+        title = inputs.get("title", "")
+        content = inputs.get("content", "")
+        channel_id = inputs.get("channel_id", None)
+
+        # Update table with new data
+        if title:
+            self._title = title
+        if content:
+            self._content = content
+        if channel_id:
+            self._channel_id = channel_id
+
         try:
             db.session.commit()
-        except Exception as e:
+        except IntegrityError:
             db.session.rollback()
-            raise e
+            return None
+        return self
     
     def delete(self):
         """
@@ -121,7 +143,19 @@ class Post(db.Model):
         except Exception as e:
             db.session.rollback()
             raise e
-
+        
+    @staticmethod
+    def restore(data):
+        for post_data in data:
+            _ = post_data.pop('id', None)  # Remove 'id' from post_data
+            title = post_data.get("title", None)
+            post = Post.query.filter_by(_title=title).first()
+            if post:
+                post.update(post_data)
+            else:
+                post = Post(**post_data)
+                post.create()
+        
 def initPosts():
     """
     The initPosts function creates the Post table and adds tester data to the table.
@@ -139,17 +173,17 @@ def initPosts():
         """Create database and tables"""
         db.create_all()
         """Tester data for table"""
+        posts = [
+            Post(title='Added Group and Channel Select', comment='The Home Page has a Section, on this page we can select Group and Channel to allow blog filtering', content={'type': 'announcement'}, user_id=1, channel_id=1),
+            Post(title='JSON content saving through content"field in database', comment='You could add other dialogs to a post that would allow custom data or even storing reference to uploaded images.', content={'type': 'announcement'}, user_id=1, channel_id=1),
+            Post(title='Allows Post by different Users', comment='Different users seeing content is a key concept in social media.', content={'type': 'announcement'}, user_id=2, channel_id=1),
+        ]
         
-        p1 = Post(title='Calculus Help', content='Need help with derivatives.', user_id=1, group_id=1)  
-        p2 = Post(title='Game Day', content='Who is coming to the game?', user_id=2, group_id=2)
-        p3 = Post(title='New Releases', content='What movies are you excited for?', user_id=3, group_id=3)
-        p4 = Post(title='Study Group', content='Meeting at the library.', user_id=1, group_id=1)
-        
-        for post in [p1, p2, p3, p4]:
+        for post in posts:
             try:
                 post.create()
                 print(f"Record created: {repr(post)}")
             except IntegrityError:
                 '''fails with bad or duplicate data'''
                 db.session.remove()
-                print(f"Records exist, duplicate email, or error: {post.uid}")
+                print(f"Records exist, duplicate email, or error: {post._title}")

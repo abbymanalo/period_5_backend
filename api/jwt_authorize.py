@@ -5,68 +5,76 @@ import jwt
 from model.user import User
 
 def token_required(roles=None):
-    '''
-    This function is used to guard API endpoints that require authentication.
-    Here is how it works:
-      1. checks for the presence of a valid JWT token in the request cookie
-      2. decodes the token and retrieves the user data
-      3. checks if the user data is found in the database
-      4. checks if the user has the required role
-      5. set the current_user in the global context (Flask's g object)
-      6. returns the decorated function if all checks pass
-    Here are some possible error responses:    
-      A. 401 / Unauthorized: token is missing or invalid
-      B. 403 / Forbidden: user has insufficient permissions
-      C. 500 / Internal Server Error: something went wrong with the token decoding
-    '''
+    """
+    Guard API endpoints that require authentication.
+
+    This function performs the following steps:
+    
+    1. Checks for the presence of a valid JWT token in the request cookie.
+    2. Decodes the token and retrieves the user data.
+    3. Checks if the user data is found in the database.
+    4. Checks if the user has the required role.
+    5. Sets the current_user in the global context (Flask's g object).
+    6. Returns the decorated function if all checks pass.
+
+    Possible error responses:
+    
+    - 401 / Unauthorized: token is missing or invalid.
+    - 403 / Forbidden: user has insufficient permissions.
+    - 500 / Internal Server Error: something went wrong with the token decoding.
+
+    Args:
+        roles (list, optional): A list of roles that are allowed to access the endpoint. Defaults to None.
+
+    Returns:
+        function: The decorated function if all checks pass.
+    """
     def decorator(func_to_guard):
         @wraps(func_to_guard)
         def decorated(*args, **kwargs):
             token = request.cookies.get(current_app.config["JWT_TOKEN_NAME"])
             if not token:
                 return {
-                    "message": "Authentication Token is missing!",
-                    "data": None,
+                    "message": "Token is missing",
                     "error": "Unauthorized"
                 }, 401
+
             try:
-                # Decode the token and retrieve the user data
                 data = jwt.decode(token, current_app.config["SECRET_KEY"], algorithms=["HS256"])
                 current_user = User.query.filter_by(_uid=data["_uid"]).first()
-                if current_user is None:
+                if not current_user:
                     return {
-                        "message": "Invalid Authentication token!",
-                        "data": None,
-                        "error": "Unauthorized"
+                        "message": "User not found",
+                        "error": "Unauthorized",
+                        "data": data
                     }, 401
-                    
-                # Check user has the required role, when role is required 
+
                 if roles and current_user.role not in roles:
                     return {
-                        "message": "Insufficient permissions. Required roles: {}".format(roles),
-                        "data": None,
-                        "error": "Forbidden"
+                        "message": "User does not have the required role",
+                        "error": "Forbidden",
+                        "data": data
                     }, 403
                     
-                # Success finding user and (optional) role
-                # Set the current_user in the global context
-                # Flask's g object is a global object that lasts for the duration of the request
-                # The g.current_user can be referenced in decorated function 
+                # Authentication succes, set the current_user in the global context (Flask's g object)
                 g.current_user = current_user
-            
-            # Error exception is for unknown jwt.decode errors 
+            except jwt.ExpiredSignatureError:
+                return {
+                    "message": "Token has expired",
+                    "error": "Unauthorized"
+                }, 401
+            except jwt.InvalidTokenError:
+                return {
+                    "message": "Invalid token",
+                    "error": "Unauthorized"
+                }, 401
             except Exception as e:
                 return {
-                    "message": "Something went wrong decoding the token!",
-                    "data": None,
+                    "message": "An error occurred",
                     "error": str(e)
                 }, 500
 
-            # Success, return to the decorated function
-            # func_to_guard is the function with the @token_required
-            # func_to_guard returns with the original function arguments
+            # Call back to the guarded function if all checks pass
             return func_to_guard(*args, **kwargs)
-
         return decorated
-
     return decorator

@@ -1,4 +1,4 @@
-""" Database dependencies to support sqliteDB examples """
+# user.py
 from flask import current_app
 from flask_login import UserMixin
 from datetime import date
@@ -59,12 +59,10 @@ class User(db.Model, UserMixin):
     _role = db.Column(db.String(20), default="User", nullable=False)
     _pfp = db.Column(db.String(255), unique=False, nullable=True)
    
-    # Define many-to-many relationship with Section model through UserSection table 
-    # Overlaps setting avoids circular dependencies with UserSection class
     posts = db.relationship('Post', backref='author', lazy=True)
-    moderated_groups = db.relationship('Group', backref='moderator', lazy=True)                              
+                                 
     
-    def __init__(self, name, uid, password=app.config["DEFAULT_PASSWORD"], role="User", pfp=''):
+    def __init__(self, name, uid, email="?", password="", role="User", pfp=''):
         """
         Constructor, 1st step in object creation.
         
@@ -77,7 +75,7 @@ class User(db.Model, UserMixin):
         """
         self._name = name
         self._uid = uid
-        self._email = "?"
+        self._email = email
         self.set_password(password)
         self._role = role
         self._pfp = pfp
@@ -223,6 +221,8 @@ class User(db.Model, UserMixin):
         Args:
             password (str): The new password for the user.
         """
+        if not password or password == "":
+            password=app.config["DEFAULT_PASSWORD"]
         self._password = generate_password_hash(password, "pbkdf2:sha256", salt_length=10)
 
     def is_password(self, password):
@@ -434,6 +434,21 @@ class User(db.Model, UserMixin):
             new_path = os.path.join(current_app.config['UPLOAD_FOLDER'], self._uid)
             if os.path.exists(old_path):
                 os.rename(old_path, new_path)
+                
+    @staticmethod
+    def restore(data):
+        users = {}
+        for user_data in data:
+            _ = user_data.pop('id', None)  # Remove 'id' from user_data and store it in user_id
+            uid = user_data.get("uid", None)
+            user = User.query.filter_by(_uid=uid).first()
+            if user:
+                user.update(user_data)
+            else:
+                user = User(**user_data)
+                user.create()
+        return users
+
 
 """Database Creation and Testing """
 
