@@ -28,21 +28,6 @@ class _NestImage(Resource):
     - HTTP status code 500 if an error occurs while reading the post picture from the server.
     """
     @token_required()
-    def get(self):
-        current_user = g.current_user
-        # Doesn't work since you can't add a body to a GET
-        data = request.get_json()
-        current_nestPost = NestPost.query.filter_by(id=data["imageID"]).first()
-
-        if current_nestPost._image_url:
-            base64_encode = nestImg_base64_decode(current_user.uid, current_nestPost._image_url)
-            if not base64_encode:
-                return {'message': 'An error occurred while reading the picture.'}, 500
-            return {'postImg': base64_encode}, 200
-        else:
-            return {'message': 'There was an error accessing the image.'}, 404
-
-    @token_required()
     def post(self):
         current_user = g.current_user
         data = request.get_json()
