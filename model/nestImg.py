@@ -33,7 +33,7 @@ def nestImg_base64_decode(user_id, imageURL):
         return None
 
 
-def nestImg_base64_upload(base64_image, user_uid):
+def nestImg_base64_upload(base64_image, file_name, current_user):
     """
     Uploads a base64 encoded image as a profile picture for a user.
 
@@ -50,8 +50,8 @@ def nestImg_base64_upload(base64_image, user_uid):
     """
     try:
         image_data = base64.b64decode(base64_image)
-        filename = secure_filename(f'{user_uid}.png')
-        user_dir = os.path.join(app.config['UPLOAD_FOLDER'], user_uid)
+        filename = secure_filename(f'{file_name}.png')
+        user_dir = os.path.join(app.config['UPLOAD_FOLDER'], current_user)
         if not os.path.exists(user_dir):
             os.makedirs(user_dir)
         file_path = os.path.join(user_dir, filename)
