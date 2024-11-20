@@ -49,7 +49,7 @@ class NestPostAPI:
             # Obtain the current user
             current_user = g.current_user
             # Find all the posts by the current user
-            posts = NestPost.query.filter(NestPost._user_id == current_user.id).all()
+            posts = NestPost.query.all()
             # Prepare a JSON list of all the posts, uses for loop shortcut called list comprehension
             json_ready = [post.read() for post in posts]
             # Return a JSON list, converting Python dictionaries to JSON format
